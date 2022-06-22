@@ -94,27 +94,8 @@ const char* keywords[] = {
 
 static struct Table* keywordTable;
 
-int isKeyword(char* buffer, char** cursor) {
-    return 0;
-    char* cur = *cursor;
-    int len = 1;
-    while (1) {
-        switch (*cur++) {
-            case '_': case '$':
-            case 'a':case 'b':case 'c':case 'd':case 'e':case 'f':case 'g':case 'h':case 'i':case 'j':case 'k':case 'l':case 'm':
-            case 'n':case 'o':case 'p':case 'q':case 'r':case 's':case 't':case 'u':case 'v':case 'w':case 'x':case 'y':case 'z':
-            case 'A':case 'B':case 'C':case 'D':case 'E':case 'F':case 'G':case 'H':case 'I':case 'J':case 'K':case 'L':case 'M':
-            case 'N':case 'O':case 'P':case 'Q':case 'R':case 'S':case 'T':case 'U':case 'V':case 'W':case 'X':case 'Y':case 'Z':
-            case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
-                len++;
-                break;
-
-            default:
-                return 0;
-        }
-    }
-
-    return 0;
+bool isKeyword(char* buffer, char** cursor) {
+    return false;
 }
 
 void minify(char* filepath) {
@@ -141,28 +122,27 @@ void minify(char* filepath) {
     fclose(fp);
 
     // alloc a parallel buffer. a minified file size must be <= size of the original file
-    // at the end we'll write this buffer to a file from 0 -> miniCursor
     char* minifiedBuffer = (char*) malloc(size + 1);
     int miniIndex = 0;
-
-    // we need to keep two arrays here, one of the identifiers in the program, and another of the minified identifer
-    char** identifiers;
-    char** minifiedIdentifiers;
 
     char* cursor = buffer;
     char c = *cursor;
 
-    int prevTokenIdent = 0;
+    bool prevTokenIdent = false;
+    bool prevTokenWhitespace = true;
+
     // walk the original buffer, copying data to output buffer
     while (c != '\0') {
-        c = *++cursor;
-
         switch (c) {
-            case 0: break;
+            case '\0':
+                prevTokenWhitespace = false;
+                goto write;
 
             // might have a comment...
-            case '/':
-                if (*(cursor + 1) == '/') {
+            case '/': {
+                prevTokenWhitespace = false;
+                char nc = *(cursor + 1);
+                if (nc == '/') {
                     while (c != '\0') {
                         if (c == '\n') {
                             break;
@@ -170,39 +150,59 @@ void minify(char* filepath) {
 
                         c = *++cursor;
                     }
-                } else if (c == '*') {
-                    int prevTokenAsterisk = 0;
+                } else if (nc == '*') {
+                    bool prevTokenAsterisk = false;
                     while (c != '\0') {
                         if (c == '*') {
-                            prevTokenAsterisk = 1;
+                            prevTokenAsterisk = true;
 
                         } else if (c == '/' && prevTokenAsterisk) {
                             break;
 
                         } else {
-                            prevTokenAsterisk = 0;
+                            prevTokenAsterisk = false;
                         }
 
                         c = *++cursor;
                     }
                 }
-                break;
+            } break;
 
+            // these characters can never be minified.
+            case '+':
+            case '-':
+            case '%':
+            case '=':
+            case '?':
+            case '.':
+            case ',':
+            case '&':
+            case '*':
+            case '!':
+            case '~':
+            case '|':
+            case ':':
             case ';':
-                // @HACK, all semicolons can be replaced with newlines, not all newlines can be replaced with semicolons
-                // not optimizing for size perfectly here - but simplifies a lot
-                c = '\n';
+            case '<':
+            case '>':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+                prevTokenWhitespace = false;
                 break;
 
             case '"':
             case '\'':
             case '`': {
+                prevTokenWhitespace = false;
                 minifiedBuffer[miniIndex++] = c;
                 char quote = c;
                 bool escape = false;
 
                 // we have to faithfully copy all bytes that are part of a string.
-                // could be non-ascii, too.
                 while (c != '\0') {
                     c = *++cursor;
 
@@ -221,69 +221,45 @@ void minify(char* filepath) {
                 }
             } break;
 
-            // these characters can never be minified.
-            case '+':
-            case '-':
-            case '%':
-            case '=':
-            case '?':
-            case '.':
-            case ',':
-            case '&':
-            case '*':
-            case '!':
-            case '~':
-            case '|':
-            case ':':
-            case '<':
-            case '>':
-            case '(':
-            case ')':
-            case '[':
-            case ']':
-            case '{':
-            case '}':
-                break;
+            // carriage return never means anything.
+            case '\r': continue;
 
-            case '\r':
-                // carriage returns can always be skipped.
-                continue;
-
-            case '\t':
-                // tabs can always safely be replaced with spaces, which can then be de-duped easier later
-                c = ' ';
-                break;
-
-            //case '\t': case '\r': //case '\n': // case ' ':
+            case '\t': case '\n': case ' ':
                 // TODO we need to check if the previous token is a keyword. certain keywords require whitespace after them, such as:
-                // let, const, var, function, new, etc.
-                // otherwise, we can skip it.
-                //continue;
-                //break;
+                // let, const, var, function, as, in, typeof, instanceof
 
-            case '_': case '$':
+                // if we just parsed some whitespace, we can skip this whitespace, as whitespace sequences larger than one can always be reduced to a sequence of 0 or 1
+                if (prevTokenWhitespace) {
+                    c = *++cursor;
+                    continue;
+                }
 
-            case ' ': case '\n': // @TEMP @HACK
+                prevTokenWhitespace = true;
+                break;
+
             case 'a':case 'b':case 'c':case 'd':case 'e':case 'f':case 'g':case 'h':case 'i':case 'j':case 'k':case 'l':case 'm':
             case 'n':case 'o':case 'p':case 'q':case 'r':case 's':case 't':case 'u':case 'v':case 'w':case 'x':case 'y':case 'z':
             case 'A':case 'B':case 'C':case 'D':case 'E':case 'F':case 'G':case 'H':case 'I':case 'J':case 'K':case 'L':case 'M':
             case 'N':case 'O':case 'P':case 'Q':case 'R':case 'S':case 'T':case 'U':case 'V':case 'W':case 'X':case 'Y':case 'Z':
-            case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+            case '_':case '$':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':
+                prevTokenWhitespace = false;
                 break;
 
             default:
-                printf("weird code point: |%hhx|, panicing...\n", c);
+                printf("weird code point: |%hhx|, panicking...\n", c);
                 exit(1);
                 break;
         }
 
+        printf("hi %c\n", c);
+
         minifiedBuffer[miniIndex++] = c;
+        c = *++cursor;
     }
 
-    minifiedBuffer[miniIndex + 1] = '\0';
-
+write:
     printf("%s\n", minifiedBuffer);
-    printf("initial size (bytes): %u, minified: %d\n", size, miniIndex);
+    printf("initial size (bytes): %u, minified: %d, a %.2f%% reduction.\n", size, miniIndex, (1 - ((float)miniIndex)/((float)size))*100);
 
     // open a file for writing.
     FILE* outFp = fopen("test.min.js", "wb");
@@ -292,9 +268,6 @@ void minify(char* filepath) {
 }
 
 int main(int argc, char* argv[]) {
-    for (int i = 0; i < (sizeof(keywords) / sizeof(char*)); i++) {
-    }
-
     if (argc > 1) {
         for (int i = 1; i < argc; i++) {
             printf("minifying |%s|...\n", argv[i]);

@@ -1,3 +1,7 @@
+// @HACK TESTING MINIFY
+const window = {};
+const document = {};
+
 
 // ws connection
 let ws = null;
@@ -384,4 +388,11 @@ function init() {
 }
 
 window.onload = init;
+
+/*
+ * multi-line
+ * comment
+ */
+
+var x = "a string with a pair ofescaped \"double quote\"s."
 
