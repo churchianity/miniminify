@@ -145,6 +145,7 @@ void minify(char* filepath) {
                 if (nc == '/') {
                     while (c != '\0') {
                         if (c == '\n') {
+                            c = *++cursor;
                             break;
                         }
 
@@ -157,6 +158,7 @@ void minify(char* filepath) {
                             prevTokenAsterisk = true;
 
                         } else if (c == '/' && prevTokenAsterisk) {
+                            c = *++cursor;
                             break;
 
                         } else {
