@@ -1,25 +1,22 @@
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
-#include "table.h"
+struct TableEntry {
+    struct TableEntry* next;
+    char* key;
+    void* value;
 
-
-const char* keywords[] = {
-    "of",      "for",        "from",      "break",      "return",  "if",
-    "try",     "true",       "false",     "finally",    "new",     "enum",
-    "const",   "in",         "continue",  "case",       "catch",   "export",
-    "extends", "set",        "interface", "instanceof", "as",      "function",
-    "void",    "async",      "static",    "var",        "null",    "yield",
-    "typeof",  "private",    "get",       "protected",  "package", "let",
-    "else",    "super",      "do",        "with",       "await",   "delete",
-    "default", "debugger",   "class",     "public",     "this",    "throw",
-    "import",  "implements", "switch",    "while"
+    uint32_t keyLength;
 };
 
-Table<const char, int>* keywordTable;
+struct Table {
+    uint32_t lanes;
+    struct TableEntry** entries;
+};
 
 // jenkins one-at-a-time string hash
 uint32_t hash(char* s, int len) {
@@ -40,6 +37,62 @@ uint32_t hash(char* s, int len) {
 
     return h;
 }
+
+struct Table* tableInit(uint32_t lanes) {
+    struct Table* table = (struct Table*) malloc(sizeof (struct Table));
+    table->lanes = lanes;
+    table->entries = (struct TableEntry**) calloc(lanes, sizeof (struct TableEntry*));
+    return table;
+}
+
+struct TableEntry* tableLookup(struct Table* table, char* key, uint32_t keyLength) {
+    uint32_t hashValue = hash(key, keyLength);
+    struct TableEntry* entry = table->entries[hashValue % table->lanes];
+
+    for (; entry != NULL; entry = entry->next) {
+        if (keyLength == entry->keyLength && !memcmp(key, entry->key, keyLength)) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
+int tableInsert(struct Table* table, char* key, uint32_t keyLength, void* value) {
+    struct TableEntry* entry = tableLookup(table, key, keyLength);
+
+    if (!entry) {
+        entry = (struct TableEntry*) malloc(sizeof (struct TableEntry));
+        entry->key = key;
+        entry->keyLength = keyLength;
+        entry->value = value;
+
+        uint32_t hashValue = hash(key, keyLength);
+        entry->next = table->entries[hashValue % table->lanes];
+        table->entries[hashValue] = entry;
+
+        return 0;
+
+    } else {
+        free(entry->value);
+        entry->value = value;
+        return 1;
+    }
+}
+
+const char* keywords[] = {
+    "of",      "for",        "from",      "break",      "return",  "if",
+    "try",     "true",       "false",     "finally",    "new",     "enum",
+    "const",   "in",         "continue",  "case",       "catch",   "export",
+    "extends", "set",        "interface", "instanceof", "as",      "function",
+    "void",    "async",      "static",    "var",        "null",    "yield",
+    "typeof",  "private",    "get",       "protected",  "package", "let",
+    "else",    "super",      "do",        "with",       "await",   "delete",
+    "default", "debugger",   "class",     "public",     "this",    "throw",
+    "import",  "implements", "switch",    "while"
+};
+
+static struct Table* keywordTable;
 
 int isKeyword(char* buffer, char** cursor) {
     return 0;
@@ -92,7 +145,7 @@ void minify(char* filepath) {
     char* minifiedBuffer = (char*) malloc(size + 1);
     int miniIndex = 0;
 
-    // we need to keep a two arrays here, one of the identifiers in the program, and another of the minified identifer
+    // we need to keep two arrays here, one of the identifiers in the program, and another of the minified identifer
     char** identifiers;
     char** minifiedIdentifiers;
 
@@ -105,6 +158,8 @@ void minify(char* filepath) {
         c = *++cursor;
 
         switch (c) {
+            case 0: break;
+
             // might have a comment...
             case '/':
                 if (*(cursor + 1) == '/') {
@@ -135,6 +190,7 @@ void minify(char* filepath) {
 
             case ';':
                 // @HACK, all semicolons can be replaced with newlines, not all newlines can be replaced with semicolons
+                // not optimizing for size perfectly here - but simplifies a lot
                 c = '\n';
                 break;
 
@@ -143,11 +199,22 @@ void minify(char* filepath) {
             case '`': {
                 minifiedBuffer[miniIndex++] = c;
                 char quote = c;
-                // we have to faithfully copy all bytes that are part of a string
+                bool escape = false;
+
+                // we have to faithfully copy all bytes that are part of a string.
+                // could be non-ascii, too.
                 while (c != '\0') {
                     c = *++cursor;
-                    if (c == quote) {
-                        break;
+
+                    if (c == '\\') {
+                        escape = true;
+
+                    } else {
+                        if (!escape && c == quote) {
+                            break;
+                        }
+
+                        escape = false;
                     }
 
                     minifiedBuffer[miniIndex++] = c;
@@ -160,23 +227,53 @@ void minify(char* filepath) {
             case '%':
             case '=':
             case '?':
-
+            case '.':
+            case ',':
+            case '&':
+            case '*':
+            case '!':
+            case '~':
+            case '|':
+            case ':':
+            case '<':
+            case '>':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
                 break;
 
-            case ' ': case '\t': case '\r': case '\n':
+            case '\r':
+                // carriage returns can always be skipped.
+                continue;
+
+            case '\t':
+                // tabs can always safely be replaced with spaces, which can then be de-duped easier later
+                c = ' ';
+                break;
+
+            //case '\t': case '\r': //case '\n': // case ' ':
                 // TODO we need to check if the previous token is a keyword. certain keywords require whitespace after them, such as:
                 // let, const, var, function, new, etc.
                 // otherwise, we can skip it.
-                continue;
-                break;
+                //continue;
+                //break;
 
             case '_': case '$':
 
+            case ' ': case '\n': // @TEMP @HACK
             case 'a':case 'b':case 'c':case 'd':case 'e':case 'f':case 'g':case 'h':case 'i':case 'j':case 'k':case 'l':case 'm':
             case 'n':case 'o':case 'p':case 'q':case 'r':case 's':case 't':case 'u':case 'v':case 'w':case 'x':case 'y':case 'z':
             case 'A':case 'B':case 'C':case 'D':case 'E':case 'F':case 'G':case 'H':case 'I':case 'J':case 'K':case 'L':case 'M':
             case 'N':case 'O':case 'P':case 'Q':case 'R':case 'S':case 'T':case 'U':case 'V':case 'W':case 'X':case 'Y':case 'Z':
             case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+                break;
+
+            default:
+                printf("weird code point: |%hhx|, panicing...\n", c);
+                exit(1);
                 break;
         }
 
@@ -195,9 +292,7 @@ void minify(char* filepath) {
 }
 
 int main(int argc, char* argv[]) {
-    keywordTable = new Table<const char, int>();
     for (int i = 0; i < (sizeof(keywords) / sizeof(char*)); i++) {
-        keywordTable->insert(keywords[i], sizeof(keywords[i]), 1);
     }
 
     if (argc > 1) {
