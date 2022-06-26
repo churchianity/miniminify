@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 struct TableEntry {
     struct TableEntry* next;
@@ -128,19 +129,21 @@ void minify(char* filepath) {
     char* cursor = buffer;
     char c = *cursor;
 
-    bool prevTokenIdent = false;
+    bool prevTokenIdentifier = false;
     bool prevTokenWhitespace = true;
 
-    // walk the original buffer, copying data to output buffer
+    // walk the original buffer, copying data to output (minified) buffer
     while (c != '\0') {
         switch (c) {
             case '\0':
                 prevTokenWhitespace = false;
+                prevTokenIdentifier = false;
                 goto write;
 
             // might have a comment...
             case '/': {
                 prevTokenWhitespace = false;
+                prevTokenIdentifier = false;
                 char nc = *(cursor + 1);
                 if (nc == '/') {
                     while (c != '\0') {
@@ -194,12 +197,14 @@ void minify(char* filepath) {
             case '{':
             case '}':
                 prevTokenWhitespace = false;
+                prevTokenIdentifier = false;
                 break;
 
             case '"':
             case '\'':
             case '`': {
                 prevTokenWhitespace = false;
+                prevTokenIdentifier = false;
                 minifiedBuffer[miniIndex++] = c;
                 char quote = c;
                 bool escape = false;
@@ -226,17 +231,23 @@ void minify(char* filepath) {
             // carriage return never means anything.
             case '\r': continue;
 
+            // relevant whitespace...
             case '\t': case '\n': case ' ':
-                // TODO we need to check if the previous token is a keyword. certain keywords require whitespace after them, such as:
-                // let, const, var, function, as, in, typeof, instanceof
-
                 // if we just parsed some whitespace, we can skip this whitespace, as whitespace sequences larger than one can always be reduced to a sequence of 0 or 1
                 if (prevTokenWhitespace) {
                     c = *++cursor;
                     continue;
                 }
 
+                // check if we just saw an identifier. if we didn't we can skip whitespace.
+                // unless we're seeing a keyword like let, const, var, function, as, in, typeof, instanceof, which require a space (or parens) after
+                if (!prevTokenIdentifier) {
+                    c = *++cursor;
+                    continue;
+                }
+
                 prevTokenWhitespace = true;
+                prevTokenIdentifier = false;
                 break;
 
             case 'a':case 'b':case 'c':case 'd':case 'e':case 'f':case 'g':case 'h':case 'i':case 'j':case 'k':case 'l':case 'm':
@@ -245,6 +256,7 @@ void minify(char* filepath) {
             case 'N':case 'O':case 'P':case 'Q':case 'R':case 'S':case 'T':case 'U':case 'V':case 'W':case 'X':case 'Y':case 'Z':
             case '_':case '$':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':
                 prevTokenWhitespace = false;
+                prevTokenIdentifier = true; // @HACK lazy, not necessarily true.
                 break;
 
             default:
@@ -253,15 +265,13 @@ void minify(char* filepath) {
                 break;
         }
 
-        printf("hi %c\n", c);
-
         minifiedBuffer[miniIndex++] = c;
         c = *++cursor;
     }
 
 write:
     printf("%s\n", minifiedBuffer);
-    printf("initial size (bytes): %u, minified: %d, a %.2f%% reduction.\n", size, miniIndex, (1 - ((float)miniIndex)/((float)size))*100);
+    printf("\ninitial size (bytes): %u, minified: %d, a %.2f%% reduction.\n", size, miniIndex, (1 - ((float)miniIndex)/((float)size))*100);
 
     // open a file for writing.
     FILE* outFp = fopen("test.min.js", "wb");
@@ -273,7 +283,11 @@ int main(int argc, char* argv[]) {
     if (argc > 1) {
         for (int i = 1; i < argc; i++) {
             printf("minifying |%s|...\n", argv[i]);
+            clock_t begin = clock();
             minify(argv[i]);
+            clock_t end = clock();
+            double timeSpent = (double)(end - begin) / CLOCKS_PER_SEC;
+            printf("Total time including printfs: %f seconds.\n", timeSpent);
         }
     }
 }
