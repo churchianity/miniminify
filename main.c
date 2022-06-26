@@ -231,9 +231,16 @@ void minify(char* filepath) {
             // carriage return never means anything.
             case '\r': continue;
 
+            case '\n':
+                // I don't know what to do here
+                prevTokenWhitespace = true;
+                prevTokenIdentifier = false;
+                break;
+
             // relevant whitespace...
-            case '\t': case '\n': case ' ':
+            case '\t': case ' ':
                 // if we just parsed some whitespace, we can skip this whitespace, as whitespace sequences larger than one can always be reduced to a sequence of 0 or 1
+                // IF, the
                 if (prevTokenWhitespace) {
                     c = *++cursor;
                     continue;
