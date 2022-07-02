@@ -95,10 +95,6 @@ const char* keywords[] = {
 
 static struct Table* keywordTable;
 
-bool isKeyword(char* buffer, char** cursor) {
-    return false;
-}
-
 void minify(char* filepath) {
     // open the file, read its contents
     FILE* fp = fopen(filepath, "rb");
@@ -129,21 +125,20 @@ void minify(char* filepath) {
     char* cursor = buffer;
     char c = *cursor;
 
-    bool prevTokenIdentifier = false;
-    bool prevTokenWhitespace = true;
+    const uint8_t PREV_TK_WHITE         = 0b00000001;
+    const uint8_t PREV_TK_IDENT         = 0b00000010;
+    const uint8_t PREV_TK_NEWLINE       = 0b00000100;
+    uint8_t flags = 1;
 
-    // walk the original buffer, copying data to output (minified) buffer
     while (c != '\0') {
         switch (c) {
             case '\0':
-                prevTokenWhitespace = false;
-                prevTokenIdentifier = false;
+                flags = 0;
                 goto write;
 
             // might have a comment...
             case '/': {
-                prevTokenWhitespace = false;
-                prevTokenIdentifier = false;
+                flags = 0;
                 char nc = *(cursor + 1);
                 if (nc == '/') {
                     while (c != '\0') {
@@ -196,15 +191,13 @@ void minify(char* filepath) {
             case ']':
             case '{':
             case '}':
-                prevTokenWhitespace = false;
-                prevTokenIdentifier = false;
+                flags = 0;
                 break;
 
             case '"':
             case '\'':
             case '`': {
-                prevTokenWhitespace = false;
-                prevTokenIdentifier = false;
+                flags = 0;
                 minifiedBuffer[miniIndex++] = c;
                 char quote = c;
                 bool escape = false;
@@ -229,32 +222,37 @@ void minify(char* filepath) {
             } break;
 
             // carriage return never means anything.
-            case '\r': continue;
+            case '\r':
+                c = *++cursor;
+                continue;
 
             case '\n':
-                // I don't know what to do here
-                prevTokenWhitespace = true;
-                prevTokenIdentifier = false;
+                if (flags & PREV_TK_NEWLINE) {
+                    c = *++cursor;
+                    continue;
+                }
+                flags &= ~PREV_TK_IDENT;
+                flags |= PREV_TK_NEWLINE | PREV_TK_WHITE;
                 break;
 
             // relevant whitespace...
             case '\t': case ' ':
                 // if we just parsed some whitespace, we can skip this whitespace, as whitespace sequences larger than one can always be reduced to a sequence of 0 or 1
                 // IF, the
-                if (prevTokenWhitespace) {
+                if (flags & PREV_TK_WHITE) {
                     c = *++cursor;
                     continue;
                 }
 
                 // check if we just saw an identifier. if we didn't we can skip whitespace.
                 // unless we're seeing a keyword like let, const, var, function, as, in, typeof, instanceof, which require a space (or parens) after
-                if (!prevTokenIdentifier) {
+                if (!(flags & PREV_TK_IDENT)) {
                     c = *++cursor;
                     continue;
                 }
 
-                prevTokenWhitespace = true;
-                prevTokenIdentifier = false;
+                flags |= PREV_TK_WHITE;
+                flags &= ~PREV_TK_IDENT;
                 break;
 
             case 'a':case 'b':case 'c':case 'd':case 'e':case 'f':case 'g':case 'h':case 'i':case 'j':case 'k':case 'l':case 'm':
@@ -262,8 +260,8 @@ void minify(char* filepath) {
             case 'A':case 'B':case 'C':case 'D':case 'E':case 'F':case 'G':case 'H':case 'I':case 'J':case 'K':case 'L':case 'M':
             case 'N':case 'O':case 'P':case 'Q':case 'R':case 'S':case 'T':case 'U':case 'V':case 'W':case 'X':case 'Y':case 'Z':
             case '_':case '$':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':
-                prevTokenWhitespace = false;
-                prevTokenIdentifier = true; // @HACK lazy, not necessarily true.
+                flags &= ~PREV_TK_WHITE;
+                flags |= PREV_TK_IDENT;
                 break;
 
             default:
@@ -277,10 +275,9 @@ void minify(char* filepath) {
     }
 
 write:
-    printf("%s\n", minifiedBuffer);
-    printf("\ninitial size (bytes): %u, minified: %d, a %.2f%% reduction.\n", size, miniIndex, (1 - ((float)miniIndex)/((float)size))*100);
+    printf("Minified: %s\n\tinitial size (bytes): %u, minified: %d, a %.2f%% reduction.\n", filepath, size, miniIndex, (1 - ((float)miniIndex)/((float)size))*100);
 
-    // open a file for writing.
+    // write the output
     FILE* outFp = fopen("test.min.js", "wb");
     fwrite(minifiedBuffer, 1, miniIndex, outFp);
     fclose(outFp);
@@ -289,7 +286,6 @@ write:
 int main(int argc, char* argv[]) {
     if (argc > 1) {
         for (int i = 1; i < argc; i++) {
-            printf("minifying |%s|...\n", argv[i]);
             clock_t begin = clock();
             minify(argv[i]);
             clock_t end = clock();
