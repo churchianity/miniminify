@@ -13,5 +13,5 @@ initial size (bytes): 14853, minified: 10768, a 27.50% reduction.
 	total time:  0.000528 seconds
 ```
 
-More test cases, better speed, and better size reduction to come.
+More test cases for robustness, better speed, and better size reduction to come.
 
