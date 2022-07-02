@@ -304,7 +304,7 @@ int main(int argc, char* argv[]) {
             double fwriteTime = (double)(writeEnd - writeBegin) / CLOCKS_PER_SEC;
             double totalTime = freadTime + minifyTime + fwriteTime;
 
-            printf("Minified: %s\ninitial size (bytes): %u, minified: %d, a %.2f%% reduction.\n\tfread time:  %f\n\tminify time: %f\n\tfwrite time: %f\n\ttotal time:  %f\n",
+            printf("Minified: %s\ninitial size (bytes): %u, minified: %d, a %.2f%% reduction.\n\tfread time:  %f seconds\n\tminify time: %f seconds\n\tfwrite time: %f seconds\n\ttotal time:  %f seconds\n",
                 argv[i],
                 size,
                 recentMinifiedBufferLength,
