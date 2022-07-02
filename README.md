@@ -13,5 +13,7 @@ initial size (bytes): 14853, minified: 10768, a 27.50% reduction.
 	total time:  0.000528 seconds
 ```
 
+The floor for performance appears to be in the order of 0.0003 seconds, as even if the minify time went to 0, we'd still have to go through fwrite and fread.
+
 More test cases for robustness, better speed, and better size reduction to come.
 
