@@ -298,6 +298,7 @@ int main(int argc, char* argv[]) {
             fclose(outFp);
             clock_t writeEnd = clock();
 
+            // obtain some measurements
             double freadTime = (double)(readEnd - readBegin) / CLOCKS_PER_SEC;
             double minifyTime = (double)(minifyEnd - minifyBegin) / CLOCKS_PER_SEC;
             double fwriteTime = (double)(writeEnd - writeBegin) / CLOCKS_PER_SEC;
@@ -313,8 +314,6 @@ int main(int argc, char* argv[]) {
                 fwriteTime,
                 totalTime
             );
-
-            //printf("Total time including printfs: %f seconds.\n", timeSpent);
         }
     }
 }
