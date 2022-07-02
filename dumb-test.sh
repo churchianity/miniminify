@@ -1,4 +1,4 @@
-
+# don't use this
 trap "echo script failed!; exit 1" ERR
 
 for i in {30..1024}
