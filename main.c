@@ -95,31 +95,11 @@ const char* keywords[] = {
 
 static struct Table* keywordTable;
 
-void minify(char* filepath) {
-    // open the file, read its contents
-    FILE* fp = fopen(filepath, "rb");
-
-    if (fp == NULL) {
-        printf("Failed to open file: |%s|\n", filepath);
-        return;
-    }
-
-    fseek(fp, 0, SEEK_END);
-    int size = ftell(fp);
-    fseek(fp, 0L, SEEK_SET);
-
-    char* buffer = (char*) malloc(size + 1);
-    if (buffer == NULL) {
-        printf("Failed to alloc buffer for file: |%s|. Probably out of memory.\n", filepath);
-        return;
-    }
-    fread(buffer, sizeof (char), size + 1, fp);
-    buffer[size] = '\0';
-
-    fclose(fp);
+int recentMinifiedBufferLength = 0;
+char* minify(char* buffer, size_t bufferLength) {
 
     // alloc a parallel buffer. a minified file size must be <= size of the original file
-    char* minifiedBuffer = (char*) malloc(size + 1);
+    char* minifiedBuffer = (char*) malloc(bufferLength + 1);
     int miniIndex = 0;
 
     char* cursor = buffer;
@@ -275,22 +255,66 @@ void minify(char* filepath) {
     }
 
 write:
-    printf("Minified: %s\n\tinitial size (bytes): %u, minified: %d, a %.2f%% reduction.\n", filepath, size, miniIndex, (1 - ((float)miniIndex)/((float)size))*100);
-
-    // write the output
-    FILE* outFp = fopen("test.min.js", "wb");
-    fwrite(minifiedBuffer, 1, miniIndex, outFp);
-    fclose(outFp);
+    recentMinifiedBufferLength = miniIndex;
+    return minifiedBuffer;
 }
 
 int main(int argc, char* argv[]) {
     if (argc > 1) {
         for (int i = 1; i < argc; i++) {
-            clock_t begin = clock();
-            minify(argv[i]);
-            clock_t end = clock();
-            double timeSpent = (double)(end - begin) / CLOCKS_PER_SEC;
-            printf("Total time including printfs: %f seconds.\n", timeSpent);
+            clock_t readBegin = clock();
+            // open the file, read its contents
+            FILE* fp = fopen(argv[i], "rb");
+
+            if (fp == NULL) {
+                printf("Failed to open file: |%s|\n", argv[i]);
+                return 1;
+            }
+
+            fseek(fp, 0, SEEK_END);
+            int size = ftell(fp);
+            fseek(fp, 0L, SEEK_SET);
+
+            char* buffer = (char*) malloc(size + 1);
+            if (buffer == NULL) {
+                printf("Failed to alloc buffer for file: |%s|. Probably out of memory.\n", argv[i]);
+                return 1;
+            }
+            fread(buffer, sizeof (char), size + 1, fp);
+            buffer[size] = '\0';
+
+            fclose(fp);
+            clock_t readEnd = clock();
+
+            // get a minified buffer
+            clock_t minifyBegin = clock();
+            char* minifiedBuffer = minify(buffer, size);
+            clock_t minifyEnd = clock();
+
+            // write the output
+            clock_t writeBegin = clock();
+            FILE* outFp = fopen("test.min.js", "wb");
+            fwrite(minifiedBuffer, 1, recentMinifiedBufferLength, outFp);
+            fclose(outFp);
+            clock_t writeEnd = clock();
+
+            double freadTime = (double)(readEnd - readBegin) / CLOCKS_PER_SEC;
+            double minifyTime = (double)(minifyEnd - minifyBegin) / CLOCKS_PER_SEC;
+            double fwriteTime = (double)(writeEnd - writeBegin) / CLOCKS_PER_SEC;
+            double totalTime = freadTime + minifyTime + fwriteTime;
+
+            printf("Minified: %s\ninitial size (bytes): %u, minified: %d, a %.2f%% reduction.\n\tfread time:  %f\n\tminify time: %f\n\tfwrite time: %f\n\ttotal time:  %f\n",
+                argv[i],
+                size,
+                recentMinifiedBufferLength,
+                (1 - ((float)recentMinifiedBufferLength)/((float)size))*100,
+                freadTime,
+                minifyTime,
+                fwriteTime,
+                totalTime
+            );
+
+            //printf("Total time including printfs: %f seconds.\n", timeSpent);
         }
     }
 }
