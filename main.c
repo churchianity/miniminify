@@ -313,7 +313,27 @@ int main(int argc, char* argv[]) {
             double fwriteTime = (double)(writeEnd - writeBegin) / CLOCKS_PER_SEC;
             double totalTime = freadTime + minifyTime + fwriteTime;
 
-            printf("Minified: %s\ninitial size (bytes): %u, minified: %d, a %.2f%% reduction.\n\tfread time:  %f seconds\n\tminify time: %f seconds\n\tfwrite time: %f seconds\n\ttotal time:  %f seconds\n",
+            char* unit;
+            double mb = size / 1000000;
+            if (mb == 0) {
+                unit = "kb";
+                mb = size / 1000;
+            } else {
+                unit = "mb";
+            }
+
+            printf(
+                "Minified: %s\n"
+                "initial size (bytes): %u, minified: %d, a %.2f%% reduction.\n"
+                "\tfread time:  %f seconds\n"
+                "\tminify time: %f seconds\n"
+                "\tfwrite time: %f seconds\n"
+                "\ttotal time:  %f seconds\n"
+                "\n"
+                "\tfread time/%s:  %f\n"
+                "\tminify time/%s: %f\n"
+                "\tfwrite time/%s: %f\n"
+                "\ttotal time/%s:  %f\n",
                 argv[i],
                 size,
                 recentMinifiedBufferLength,
@@ -321,7 +341,15 @@ int main(int argc, char* argv[]) {
                 freadTime,
                 minifyTime,
                 fwriteTime,
-                totalTime
+                totalTime,
+                unit,
+                mb / freadTime,
+                unit,
+                mb / minifyTime,
+                unit,
+                mb / fwriteTime,
+                unit,
+                mb / totalTime
             );
         }
     }
