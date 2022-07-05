@@ -123,13 +123,16 @@ char* minify(char* buffer, size_t bufferLength) {
         switch (c) {
             case '\0':
                 flags = 0;
-                goto write;
+                goto done;
 
             // might have a comment...
             case '/': {
                 flags = 0;
                 char nc = *(cursor + 1);
                 if (nc == '/') {
+                    cursor += 2;
+                    c = *cursor;
+
                     while (c != '\0') {
                         if (c == '\n') {
                             c = *++cursor;
@@ -138,6 +141,8 @@ char* minify(char* buffer, size_t bufferLength) {
 
                         c = *++cursor;
                     }
+                    continue;
+
                 } else if (nc == '*') {
                     bool prevTokenAsterisk = false;
                     while (c != '\0') {
@@ -154,6 +159,7 @@ char* minify(char* buffer, size_t bufferLength) {
 
                         c = *++cursor;
                     }
+                    continue;
                 }
             } break;
 
@@ -263,7 +269,7 @@ char* minify(char* buffer, size_t bufferLength) {
         c = *++cursor;
     }
 
-write:
+done:
     recentMinifiedBufferLength = miniIndex;
     return minifiedBuffer;
 }
@@ -343,13 +349,13 @@ int main(int argc, char* argv[]) {
                 fwriteTime,
                 totalTime,
                 unit,
-                mb / freadTime,
+                freadTime / mb,
                 unit,
-                mb / minifyTime,
+                minifyTime / mb,
                 unit,
-                mb / fwriteTime,
+                fwriteTime / mb,
                 unit,
-                mb / totalTime
+                totalTime / mb
             );
         }
     }
