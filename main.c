@@ -314,48 +314,49 @@ int main(int argc, char* argv[]) {
             clock_t writeEnd = clock();
 
             // obtain some measurements
+            char* timeUnit = "seconds";
             double freadTime = (double)(readEnd - readBegin) / CLOCKS_PER_SEC;
             double minifyTime = (double)(minifyEnd - minifyBegin) / CLOCKS_PER_SEC;
             double fwriteTime = (double)(writeEnd - writeBegin) / CLOCKS_PER_SEC;
             double totalTime = freadTime + minifyTime + fwriteTime;
+            if (totalTime < 0.01) {
+                timeUnit = "milliseconds";
+                freadTime *= 1000;
+                minifyTime *= 1000;
+                fwriteTime *= 1000;
+                totalTime *= 1000;
+            }
 
-            char* unit;
-            double mb = size / 1000000;
-            if (mb == 0) {
-                unit = "kb";
-                mb = size / 1000;
-            } else {
-                unit = "mb";
+            double floatSize = size;
+            double floatMinSize = recentMinifiedBufferLength;
+            char* sizeUnit = "bytes";
+            if (size > 1000000) {
+                sizeUnit = "mb";
+                floatSize /= 1000000;
+                floatMinSize /= 1000000;
+
+            } else if (size > 1000) {
+                sizeUnit = "kb";
+                floatSize /= 1000;
+                floatMinSize /= 1000;
             }
 
             printf(
-                "Minified: %s\n"
-                "initial size (bytes): %u, minified: %d, a %.2f%% reduction.\n"
-                "\tfread time:  %f seconds\n"
-                "\tminify time: %f seconds\n"
-                "\tfwrite time: %f seconds\n"
-                "\ttotal time:  %f seconds\n"
-                "\n"
-                "\tfread time/%s:  %f\n"
-                "\tminify time/%s: %f\n"
-                "\tfwrite time/%s: %f\n"
-                "\ttotal time/%s:  %f\n",
+                "Minified file: %s\n"
+                "initial size (%s): %g, minified: %g, a %.2f%% reduction.\n"
+                "\traw time            | time/%s\n"
+                "\tfread time:  %.4f | %.4f\n"
+                "\tminify time: %.4f | %.4f\n"
+                "\tfwrite time: %.4f | %.4f\n"
+                "\ttotal time:  %.4f | %.4f\n"
+                "\n",
                 argv[i],
-                size,
-                recentMinifiedBufferLength,
-                (1 - ((float)recentMinifiedBufferLength)/((float)size))*100,
-                freadTime,
-                minifyTime,
-                fwriteTime,
-                totalTime,
-                unit,
-                freadTime / mb,
-                unit,
-                minifyTime / mb,
-                unit,
-                fwriteTime / mb,
-                unit,
-                totalTime / mb
+                sizeUnit, floatSize, floatMinSize, (1 - (floatMinSize)/(floatSize))*100,
+                sizeUnit,
+                freadTime, freadTime / floatSize,
+                minifyTime, minifyTime / floatSize,
+                fwriteTime, fwriteTime / floatSize,
+                totalTime, totalTime / floatSize
             );
         }
     }
