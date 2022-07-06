@@ -1,3 +1,3 @@
 
 compile:
-		clang -o out main.c
+		clang -o miniminify main.c
