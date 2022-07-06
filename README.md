@@ -17,3 +17,6 @@ initial size (kb): 14.853, minified: 10.734, a 27.73% reduction.
 
 More test cases for robustness, better speed, and better size reduction to come.
 
+# Compiling / Building
+Run `make`.
+
