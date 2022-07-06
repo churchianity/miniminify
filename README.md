@@ -5,14 +5,16 @@ What I mean by naive, is that it assumes your Javascript input has already been 
 
 Minifying a fairly small file with almost no comments still gets you decent savings:
 ```
-> ./miniminify ../test.js
-Minified file: ../test.js
-initial size (kb): 14.853, minified: 10.734, a 27.73% reduction.
-	raw time            | time/kb
-	fread time:  0.1030 | 0.0069
-	minify time: 0.1190 | 0.0080
-	fwrite time: 0.3380 | 0.0228
-	total time:  0.5600 | 0.0377
+> ./miniminify js.js
+
+Minified file: js.js
+initial size (kb): 68.479, minified: 50.829, a 25.77% reduction.
+	| raw time (milliseconds)        | time/kb
+	| fread time:  0.1010            | 0.0015
+	| minify time: 0.3210            | 0.0047
+	| fwrite time: 0.3350            | 0.0049
+	| total time:  0.7570            | 0.0111
+
 ```
 
 More test cases for robustness, better speed, and better size reduction to come.
