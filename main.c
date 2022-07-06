@@ -342,17 +342,17 @@ int main(int argc, char* argv[]) {
             }
 
             printf(
-                "Minified file: %s\n"
+                "\nMinified file: %s\n"
                 "initial size (%s): %g, minified: %g, a %.2f%% reduction.\n"
-                "\traw time            | time/%s\n"
-                "\tfread time:  %.4f | %.4f\n"
-                "\tminify time: %.4f | %.4f\n"
-                "\tfwrite time: %.4f | %.4f\n"
-                "\ttotal time:  %.4f | %.4f\n"
+                "\t| raw time (%12s)        | time/%s\n"
+                "\t| fread time:  %.4f            | %.4f\n"
+                "\t| minify time: %.4f            | %.4f\n"
+                "\t| fwrite time: %.4f            | %.4f\n"
+                "\t| total time:  %.4f            | %.4f\n"
                 "\n",
                 argv[i],
                 sizeUnit, floatSize, floatMinSize, (1 - (floatMinSize)/(floatSize))*100,
-                sizeUnit,
+                timeUnit, sizeUnit,
                 freadTime, freadTime / floatSize,
                 minifyTime, minifyTime / floatSize,
                 fwriteTime, fwriteTime / floatSize,
